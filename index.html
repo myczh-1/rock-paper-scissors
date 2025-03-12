@@ -25,11 +25,14 @@
       #resultDisplay { font-size: 24px; }
       #mobileButtons button { margin: 10px; font-size: 22px; padding: 15px 25px; }
       button { font-size: 20px; padding: 10px 20px; }
+      .pc{
+      display:none;
+     }
     }
   </style>
 </head>
 <body>
-  <h1>剪刀石头布金币游戏 Demo</h1>
+  <h1 class="pc">剪刀石头布金币游戏 Demo</h1>
   <div id="gameArea">
     <div>
       <strong>当前金币：</strong><span id="coinsDisplay">0</span>
@@ -59,17 +62,17 @@
         <input type="number" id="autoDelayInput" value="1">
       </label>
     </div>
-    <div class="setting">
+    <div class="setting pc">
       <label>剪刀键（对应“剪刀”）： 
         <input type="text" id="keyScissorsInput" value="s">
       </label>
     </div>
-    <div class="setting">
+    <div class="setting pc">
       <label>石头键（对应“石头”）： 
         <input type="text" id="keyRockInput" value="r">
       </label>
     </div>
-    <div class="setting">
+    <div class="setting pc">
       <label>布键（对应“布”）： 
         <input type="text" id="keyPaperInput" value="p">
       </label>
