@@ -73,4 +73,261 @@
       <label>布键（对应“布”）： 
         <input type="text" id="keyPaperInput" value="p">
       </label>
-    <
+    </div>
+    <button id="applySettingsButton">应用设置</button>
+    <hr>
+    <h3>历史排行</h3>
+    <div>历史最高：<span id="highestScore"></span></div>
+    <div>历史最低：<span id="lowestScore"></span></div>
+  </div>
+
+  <script>
+    // 全局变量及默认设置
+    let initialCoins = 1000;
+    let coins = initialCoins;
+    let autoDelay = 1; // 单位：秒
+    let roundDuration = 2000; // 每局2秒（毫秒）
+    let roundTimer = null;
+    let nextRoundTimer = null;
+    let countdownInterval = null;
+    let isGameRunning = false;
+    let isPaused = false;
+    let roundActive = false;
+    let currentComputerMove = null;
+
+    // 默认键位映射（玩家按键对应的出拳）
+    let keyMapping = {
+      scissors: "剪刀",
+      rock: "石头",
+      paper: "布"
+    };
+
+    // 规则：电脑出拳对应玩家制胜的出拳：
+    // 电脑出剪刀 => 玩家用石头获胜
+    // 电脑出石头 => 玩家用布获胜
+    // 电脑出布   => 玩家用剪刀获胜
+    const winningMap = {
+      "剪刀": "石头",
+      "石头": "布",
+      "布": "剪刀"
+    };
+
+    // HTML 元素
+    const coinsDisplay = document.getElementById("coinsDisplay");
+    const moveDisplay = document.getElementById("moveDisplay");
+    const timerDisplay = document.getElementById("timerDisplay");
+    const resultDisplay = document.getElementById("resultDisplay");
+    const startButton = document.getElementById("startButton");
+    const pauseButton = document.getElementById("pauseButton");
+    const applySettingsButton = document.getElementById("applySettingsButton");
+    const initialCoinsInput = document.getElementById("initialCoinsInput");
+    const autoDelayInput = document.getElementById("autoDelayInput");
+    const keyScissorsInput = document.getElementById("keyScissorsInput");
+    const keyRockInput = document.getElementById("keyRockInput");
+    const keyPaperInput = document.getElementById("keyPaperInput");
+    const highestScoreDisplay = document.getElementById("highestScore");
+    const lowestScoreDisplay = document.getElementById("lowestScore");
+
+    // 更新显示金币并更新历史排行
+    function updateCoinsDisplay() {
+      coinsDisplay.textContent = coins;
+      updateHistory();
+    }
+
+    // 加载历史排行数据
+    function loadHistory() {
+      let storedHighest = localStorage.getItem('highestScore');
+      let storedLowest = localStorage.getItem('lowestScore');
+      if (storedHighest === null) {
+        storedHighest = initialCoins;
+        localStorage.setItem('highestScore', initialCoins);
+      }
+      if (storedLowest === null) {
+        storedLowest = initialCoins;
+        localStorage.setItem('lowestScore', initialCoins);
+      }
+      highestScoreDisplay.textContent = storedHighest;
+      lowestScoreDisplay.textContent = storedLowest;
+    }
+
+    // 更新历史排行数据
+    function updateHistory() {
+      let storedHighest = localStorage.getItem('highestScore');
+      let storedLowest = localStorage.getItem('lowestScore');
+      if (storedHighest === null || coins > parseInt(storedHighest)) {
+        storedHighest = coins;
+        localStorage.setItem('highestScore', coins);
+      }
+      if (storedLowest === null || coins < parseInt(storedLowest)) {
+        storedLowest = coins;
+        localStorage.setItem('lowestScore', coins);
+      }
+      highestScoreDisplay.textContent = storedHighest;
+      lowestScoreDisplay.textContent = storedLowest;
+    }
+
+    // 随机生成电脑出拳
+    function getRandomMove() {
+      const moves = ["剪刀", "石头", "布"];
+      return moves[Math.floor(Math.random() * moves.length)];
+    }
+
+    // 开始新的一局
+    function startRound() {
+      if (!isGameRunning || isPaused) return;
+      roundActive = true;
+      resultDisplay.textContent = "";
+      // 生成电脑的随机出拳
+      currentComputerMove = getRandomMove();
+      moveDisplay.textContent = currentComputerMove;
+      
+      // 启动倒计时显示
+      let startTime = Date.now();
+      timerDisplay.textContent = (roundDuration / 1000).toFixed(2);
+      countdownInterval = setInterval(() => {
+        let elapsed = Date.now() - startTime;
+        let remaining = roundDuration - elapsed;
+        if (remaining < 0) remaining = 0;
+        timerDisplay.textContent = (remaining / 1000).toFixed(2);
+      }, 50);
+
+      // 开启2秒倒计时，超时未出拳判定为失败
+      roundTimer = setTimeout(() => {
+        if (roundActive) {
+          clearInterval(countdownInterval);
+          roundActive = false;
+          resultDisplay.textContent = "超时！-1000金币";
+          coins -= 1000;
+          updateCoinsDisplay();
+          document.removeEventListener("keydown", handleKeyDown);
+          scheduleNextRound();
+        }
+      }, roundDuration);
+      // 监听键盘输入
+      document.addEventListener("keydown", handleKeyDown);
+    }
+
+    // 处理玩家出拳（由键盘或按钮调用）
+    function processPlayerMove(playerMove) {
+      if (!roundActive) return;
+      clearTimeout(roundTimer);
+      clearInterval(countdownInterval);
+      roundActive = false;
+      document.removeEventListener("keydown", handleKeyDown);
+
+      if (playerMove === winningMap[currentComputerMove]) {
+        resultDisplay.textContent = `你赢了！+1金币 （你出【${playerMove}】）`;
+        coins += 1;
+      } else if (playerMove === currentComputerMove) {
+        resultDisplay.textContent = `平局！金币不变 （你出【${playerMove}】）`;
+      } else {
+        resultDisplay.textContent = `你输了！-1000金币 （你出【${playerMove}】）`;
+        coins -= 1000;
+      }
+      updateCoinsDisplay();
+      scheduleNextRound();
+    }
+
+    // 键盘事件处理
+    function handleKeyDown(e) {
+      if (!roundActive) return;
+      const keyPressed = e.key.toLowerCase();
+      let playerMove = null;
+      if (keyPressed === keyMapping.scissorsKey) {
+        playerMove = keyMapping.scissors;
+      } else if (keyPressed === keyMapping.rockKey) {
+        playerMove = keyMapping.rock;
+      } else if (keyPressed === keyMapping.paperKey) {
+        playerMove = keyMapping.paper;
+      } else {
+        return;
+      }
+      processPlayerMove(playerMove);
+    }
+
+    // 安排自动开始下一局
+    function scheduleNextRound() {
+      nextRoundTimer = setTimeout(() => {
+        startRound();
+      }, autoDelay * 1000);
+    }
+
+    // 开始游戏
+    function startGame() {
+      if (isGameRunning) return;
+      isGameRunning = true;
+      isPaused = false;
+      coins = initialCoins;
+      updateCoinsDisplay();
+      moveDisplay.textContent = "--";
+      resultDisplay.textContent = "";
+      startRound();
+    }
+
+    // 暂停游戏
+    function pauseGame() {
+      if (!isGameRunning) return;
+      isPaused = true;
+      clearTimeout(roundTimer);
+      clearTimeout(nextRoundTimer);
+      clearInterval(countdownInterval);
+      roundActive = false;
+      document.removeEventListener("keydown", handleKeyDown);
+      resultDisplay.textContent = "已暂停";
+    }
+
+    // 恢复游戏
+    function resumeGame() {
+      if (!isGameRunning || !isPaused) return;
+      isPaused = false;
+      resultDisplay.textContent = "恢复游戏";
+      startRound();
+    }
+
+    // 切换暂停/恢复状态
+    pauseButton.addEventListener("click", () => {
+      if (!isGameRunning) return;
+      if (isPaused) {
+        resumeGame();
+        pauseButton.textContent = "暂停";
+      } else {
+        pauseGame();
+        pauseButton.textContent = "恢复";
+      }
+    });
+
+    // 点击“开始游戏”按钮
+    startButton.addEventListener("click", () => {
+      if (isGameRunning) {
+        clearTimeout(roundTimer);
+        clearTimeout(nextRoundTimer);
+        clearInterval(countdownInterval);
+        document.removeEventListener("keydown", handleKeyDown);
+      }
+      isGameRunning = false;
+      pauseButton.textContent = "暂停";
+      startGame();
+    });
+
+    // 应用设置：更新初始金币、自动延时和自定义键位
+    applySettingsButton.addEventListener("click", () => {
+      initialCoins = parseInt(initialCoinsInput.value) || 0;
+      autoDelay = parseFloat(autoDelayInput.value) || 1;
+      keyMapping.scissors = "剪刀";
+      keyMapping.rock = "石头";
+      keyMapping.paper = "布";
+      keyMapping.scissorsKey = keyScissorsInput.value.toLowerCase();
+      keyMapping.rockKey = keyRockInput.value.toLowerCase();
+      keyMapping.paperKey = keyPaperInput.value.toLowerCase();
+      resultDisplay.textContent = "设置已应用";
+      loadHistory(); // 刷新历史排行显示
+    });
+
+    // 初始化默认设置
+    window.onload = () => {
+      applySettingsButton.click();
+      loadHistory();
+    };
+  </script>
+</body>
+</html>
